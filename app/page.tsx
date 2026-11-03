@@ -1,69 +1,141 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+import { FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { ThemeToggle } from '@/components/theme-provider';
+
+type Drive = { id: string; name: string };
+
+export default function HomePage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [drives, setDrives] = useState<Drive[]>([]);
+  const [userEmail, setUserEmail] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [deletingDriveId, setDeletingDriveId] = useState<string | null>(null);
+
+  async function loadDrives() {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) {
+      setLoading(false);
+      return;
+    }
+    setUserEmail(userData.user.email ?? '');
+    const { data, error: driveError } = await supabase
+      .from('drive_workspaces')
+      .select('id, name')
+      .order('created_at', { ascending: false });
+    if (driveError) setError(driveError.message);
+    setDrives(data ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadDrives(), 0);
+    const { data } = supabase.auth.onAuthStateChange(() => void loadDrives());
+    return () => {
+      window.clearTimeout(timer);
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function authenticate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setMessage('');
+    const result = name.trim()
+      ? await supabase.auth.signUp({ email, password, options: { data: { name: name.trim() } } })
+      : await supabase.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      setError(result.error.message);
+    } else {
+      setMessage(name.trim() ? 'Check your email to confirm your account, then sign in.' : 'Signed in.');
+      if (!name.trim()) await loadDrives();
+    }
+  }
+
+  async function createDrive(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const driveName = String(form.get('name') ?? '').trim();
+    if (!driveName) return;
+    const { data, error: createError } = await supabase.rpc('create_drive_workspace', {
+      workspace_name: driveName,
+    });
+    if (createError) setError(createError.message);
+    else if (data) router.push(`/drive/${data}`);
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setDrives([]);
+    setUserEmail('');
+  }
+
+  async function deleteDrive(drive: Drive) {
+    if (!window.confirm(`Delete "${drive.name}" and all of its files permanently?`)) return;
+    setError('');
+    setDeletingDriveId(drive.id);
+    const response = await fetch('/api/drive/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: drive.id }),
+    });
+    const result = await response.json().catch(() => null) as { error?: string } | null;
+    setDeletingDriveId(null);
+    if (!response.ok) {
+      setError(result?.error ?? 'Could not delete the drive.');
+      return;
+    }
+    setDrives((current) => current.filter((item) => item.id !== drive.id));
+  }
+
+  if (loading) {
+    return <main className="warm-page flex min-h-screen items-center justify-center warm-muted">Loading…</main>;
+  }
+
+  if (!userEmail) {
+    return (
+      <main className="warm-page min-h-screen px-6 py-16">
+        <div className="mx-auto max-w-md">
+          <div className="flex items-center justify-between"><p className="text-sm font-semibold uppercase tracking-[0.3em]" style={{ color: 'var(--accent)' }}>Distributed cloud drive</p><ThemeToggle /></div>
+          <h1 className="mt-4 text-4xl font-semibold">Your files, without the bottleneck.</h1>
+          <p className="mt-4 warm-muted">Sign in to create private drives, upload directly to S3, and collaborate on documents.</p>
+          <form onSubmit={authenticate} className="warm-surface mt-8 rounded-2xl border p-6">
+            <label className="block text-sm">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} className="warm-input mt-2 w-full rounded-lg border px-3 py-2.5" /></label>
+            <label className="mt-4 block text-sm">Password<input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="warm-input mt-2 w-full rounded-lg border px-3 py-2.5" /></label>
+            <label className="mt-4 block text-sm">Name only when creating an account<input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Leave blank to sign in" className="warm-input mt-2 w-full rounded-lg border px-3 py-2.5" /></label>
+            <button className="warm-accent mt-6 w-full rounded-lg px-4 py-2.5 font-semibold">{name.trim() ? 'Create account' : 'Sign in'}</button>
+          </form>
+          {message && <p className="mt-4 text-sm text-emerald-300">{message}</p>}
+          {error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>}
         </div>
       </main>
-    </div>
+    );
+  }
+
+  return (
+    <main className="warm-page min-h-screen px-6 py-12">
+      <div className="mx-auto max-w-4xl">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div><p className="text-sm" style={{ color: 'var(--accent)' }}>Distributed cloud drive</p><h1 className="mt-2 text-4xl font-semibold">Your drives</h1></div>
+          <div className="flex items-center gap-3 text-sm warm-muted"><span>{userEmail}</span><ThemeToggle /><button onClick={signOut} className="theme-toggle">Sign out</button></div>
+        </header>
+        <form onSubmit={createDrive} className="mt-10 flex gap-3">
+          <input name="name" required maxLength={120} placeholder="New drive name" className="warm-input min-w-0 flex-1 rounded-lg border px-4 py-3" />
+          <button className="warm-accent rounded-lg px-5 font-semibold">Create drive</button>
+        </form>
+        {error && <p role="alert" className="mt-4 text-sm text-rose-300">{error}</p>}
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {drives.map((drive) => <div key={drive.id} className="warm-surface rounded-xl border p-6"><button onClick={() => router.push(`/drive/${drive.id}`)} className="w-full text-left hover:text-[var(--accent)]"><span className="text-3xl">▣</span><h2 className="mt-4 text-lg font-semibold">{drive.name}</h2><p className="mt-1 warm-muted text-sm">Open drive</p></button><button type="button" disabled={deletingDriveId === drive.id} onClick={() => void deleteDrive(drive)} className="mt-5 text-sm font-medium hover:text-[var(--accent-strong)] disabled:opacity-50">{deletingDriveId === drive.id ? <span className="flex items-center gap-2"><span className="spinner" />Deleting…</span> : 'Delete drive'}</button></div>)}
+          {!drives.length && <p className="warm-muted">Create your first drive to get started.</p>}
+        </div>
+      </div>
+    </main>
   );
 }
