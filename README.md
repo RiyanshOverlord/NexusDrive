@@ -1,49 +1,66 @@
 # NexusDrive
 
-NexusDrive is a private cloud-drive application built with Next.js,
-Supabase, and private Amazon S3 storage. Authenticated users can create
-isolated drives, organize files into folders, upload files directly to S3,
-download them through short-lived signed URLs, and manage drive contents.
+NexusDrive is a Next.js cloud-drive application for authenticated users. It
+provides private drives, folders, direct uploads to private Amazon S3 storage,
+signed downloads, and drive management through Supabase.
+
+The repository also contains the original realtime text-workspace prototype.
+It is documented separately below so the README reflects what is actually
+implemented without presenting it as part of the main private-drive flow.
 
 ## Demo
 
-The repository includes [`NexusDrive.mp4`](./NexusDrive.mp4), a local copy of
-the application walkthrough.
+The walkthrough video is committed at [`NexusDrive.mp4`](./NexusDrive.mp4).
 
-To display the demo as GitHub's compact playable video box, follow the
-instructions in [Adding the video to GitHub](#adding-the-video-to-github).
+You can also open or download it from GitHub:
 
-<!-- Replace the placeholder below with the GitHub user-attachment URL after
-     uploading NexusDrive.mp4 to a GitHub issue, discussion, or pull request. -->
+[View the NexusDrive demo video](https://github.com/RiyanshOverlord/NexusDrive/blob/main/NexusDrive.mp4)
 
-`PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE`
+To show the video as GitHub's small inline player, follow
+[Adding the video player to GitHub](#adding-the-video-player-to-github).
 
-## Implemented features
+## Implemented functionality
+
+### Private drive workflow
 
 - Email/password sign-up and sign-in with Supabase Auth.
-- Private drives created for the authenticated owner.
-- Drive listing and owner-only drive deletion.
-- Folder creation and folder navigation.
-- Direct browser-to-S3 file uploads using presigned URLs.
-- Upload validation for supported file types and files up to 25 MB.
-- Upload finalization after the server verifies the S3 object.
-- Signed downloads for private files.
-- File and folder deletion, including child items.
-- Supabase Realtime refreshes for drive metadata changes.
-- Persistent light and dark themes.
-- Optimistic UI updates for folder creation and file uploads.
+- Authenticated users can create and list private drives.
+- Drive owners can permanently delete a drive after confirmation.
+- Each drive starts with a root folder named `My Drive`.
+- Users can create folders and navigate through nested folders.
+- Users can upload supported files up to 25 MB.
+- File bytes upload directly from the browser to private S3 using a short-lived
+  presigned URL.
+- Uploads are finalized only after the server verifies the S3 object.
+- Users can download private files through short-lived signed URLs.
+- Users can delete files and folders, including child items.
+- Drive item changes refresh through Supabase Realtime.
+- Folder creation and uploads use optimistic UI updates.
+- Light and dark themes persist in the browser.
 
-The delivered application is a private drive workflow. Multi-user editing,
-invitations, sharing links, presence, and collaborative document editing are
-not implemented.
+### Realtime text-workspace prototype
+
+The repository also includes `/workspace/[id]`, backed by
+[`001_create_workspaces.sql`](./supabase/migrations/001_create_workspaces.sql):
+
+- A text workspace can be loaded and edited by multiple connected clients.
+- Edits are broadcast through a Supabase Realtime channel.
+- Connected peers are shown through ephemeral presence.
+- Changes are saved after 400 ms of inactivity.
+- Database saves use timestamp and client ID ordering for deterministic
+  last-write-wins conflict handling.
+- Workspace content is limited to 200,000 characters.
+
+This prototype is separate from the authenticated private-drive schema. The
+main home page and drive routes use the private-drive migration.
 
 ## Technology
 
-- Next.js 16 with the App Router
+- Next.js 16 App Router
 - React 19 and TypeScript
 - Supabase Auth, PostgreSQL, Row Level Security, and Realtime
 - Amazon S3 with AWS SDK presigned PUT and GET URLs
-- Tailwind CSS
+- Tailwind CSS 4
 
 ## Local setup
 
@@ -55,7 +72,7 @@ npm install
 
 ### 2. Configure environment variables
 
-Create a `.env.local` file in the project directory:
+Create `.env.local` in the project directory:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -67,36 +84,37 @@ AWS_SECRET_ACCESS_KEY=server-side-secret-key
 AWS_S3_BUCKET_NAME=your-private-bucket
 ```
 
-The `NEXT_PUBLIC_*` Supabase values are intended for browser use. AWS
-credentials must remain server-side and must never be exposed through
-`NEXT_PUBLIC_*` variables or committed to the repository.
+Only the Supabase `NEXT_PUBLIC_*` values are browser-accessible. AWS
+credentials must remain server-side and must never be committed.
 
 ### 3. Configure Supabase
 
 Run [`002_create_private_drive.sql`](./supabase/migrations/002_create_private_drive.sql)
-in the Supabase SQL Editor. The migration creates:
+in the Supabase SQL Editor. It creates:
 
-- Private drive workspaces
-- Drive membership records
+- Private drive workspaces and membership records
 - Per-drive root folders and file metadata
 - Row Level Security policies
 - The `create_drive_workspace` database function
 - Realtime support for drive item changes
 
 Enable Email/Password authentication in Supabase Authentication. For local
-testing, email confirmation may be disabled. Production deployments should
+testing, email confirmation can be disabled. Production deployments should
 keep confirmation enabled and configure a real mail provider.
+
+The separate text-workspace prototype requires
+[`001_create_workspaces.sql`](./supabase/migrations/001_create_workspaces.sql).
 
 ### 4. Configure the S3 bucket
 
 Create a private S3 bucket with Block Public Access enabled. The server-side
-IAM identity needs only the following permissions for this bucket:
+IAM identity needs:
 
 - `s3:PutObject`
 - `s3:GetObject`
 - `s3:DeleteObject`
 
-Configure bucket CORS for local development and your deployed origin:
+Configure bucket CORS for local development and the deployed origin:
 
 ```json
 [
@@ -121,13 +139,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Production deployment
+## Deployment
 
-The application is deployed on Vercel:
+The deployed application is available at:
 
-**Production URL:** https://nexus-drive-xi.vercel.app
+**https://nexus-drive-xi.vercel.app**
 
-Add these variables to the Vercel project:
+Add the same environment variables to the Vercel project:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
@@ -138,63 +156,74 @@ AWS_SECRET_ACCESS_KEY
 AWS_S3_BUCKET_NAME
 ```
 
-After deployment, verify sign-in, drive creation, folder creation, uploads,
-downloads, deletion, and theme switching.
+After deployment, verify authentication, drive creation, folder navigation,
+file upload, file download, deletion, and theme switching.
 
 ## Storage and security behavior
 
-- Drive records are protected by Supabase Auth membership checks and Row
-  Level Security.
-- File bytes are uploaded directly from the browser to S3; the application
-  server does not proxy the file contents.
-- Presigned upload and download URLs are short-lived.
+- Supabase Auth membership checks and Row Level Security protect drive data.
+- The browser uploads file bytes directly to S3; the application server does
+  not proxy them.
+- Presigned upload and download URLs expire after a short period.
 - Generated S3 object keys prevent client filenames from controlling storage
   paths.
-- Uploads are limited to 25 MB.
-- Supported upload types include PDF, ZIP, JSON, CSV, plain text, GIF, JPEG,
-  PNG, and WebP files.
+- Uploads are limited to 25 MB and restricted to the MIME types defined in
+  [`lib/storage.ts`](./lib/storage.ts).
 - Pending uploads remain visible until they are finalized or cleaned up.
 
-Configure AWS billing alerts and lifecycle cleanup before sharing a
-deployment. Free-tier limits vary by AWS account and region.
+Never commit `.env.local`, AWS access keys, Supabase tokens, or other
+credentials. Keep the S3 bucket private.
 
-## Adding the video to GitHub
+## Adding the video player to GitHub
 
-The committed MP4 is useful as a repository file, but GitHub does not usually
-render a committed MP4 path as the small inline video player shown in issues
-and README previews. Use a GitHub user attachment instead:
+The committed file link you provided:
+
+```text
+https://github.com/RiyanshOverlord/NexusDrive/blob/main/NexusDrive.mp4
+```
+
+opens the MP4 as a repository file. GitHub does not normally turn that
+`blob` URL into the small inline video box inside a README. Use a GitHub user
+attachment instead:
 
 1. Open a new issue, discussion, or pull request in the repository.
 2. Start writing a comment.
-3. Drag [`NexusDrive.mp4`](./NexusDrive.mp4) into the comment box, or use the
+3. Drag `NexusDrive.mp4` from the repository into the comment box, or use the
    attachment control.
 4. Wait for GitHub to finish uploading the video.
-5. Copy the generated URL. It normally resembles:
+5. Copy the generated URL. It normally looks like:
 
    ```text
    https://github.com/user-attachments/assets/<video-id>
    ```
 
 6. Edit this README and replace
-   `PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE` with the full generated URL on
-   its own line.
+   `PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE` with that full URL on its own
+   line.
 7. Commit and push the README.
 8. Open the README on GitHub. GitHub should render the attachment URL as a
    compact playable video box.
 
+Add the attachment URL here after uploading it:
+
+```text
+PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE
+```
+
 Keep [`NexusDrive.mp4`](./NexusDrive.mp4) in the repository as a downloadable
-copy even after adding the GitHub attachment URL.
+copy.
 
 ## Project structure
 
 ```text
 app/
   page.tsx                         Authentication and drive list
-  drive/[id]/                      Drive browser and file operations
+  drive/[id]/                      Private drive browser
+  workspace/[id]/                  Legacy realtime text workspace
   api/storage/                     S3 presign, finalize, and download routes
   api/drive/delete/                Owner-only drive deletion route
 components/                        Shared UI components
-lib/                               Supabase and S3 helpers
+lib/                               Supabase, S3, and workspace helpers
 supabase/migrations/               Database schema and security policies
 ```
 
@@ -206,8 +235,3 @@ npm run lint      # Run ESLint
 npm run build     # Create a production build
 npm run start     # Start the production server
 ```
-
-## Security notes
-
-Never commit `.env.local`, AWS access keys, Supabase tokens, or other
-credentials. Keep the S3 bucket private and use signed URLs for file access.
