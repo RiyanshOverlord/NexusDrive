@@ -10,11 +10,12 @@ implemented without presenting it as part of the main private-drive flow.
 
 ## Demo
 
-The walkthrough video is committed at [`NexusDrive.mp4`](./NexusDrive.mp4).
+https://github.com/user-attachments/assets/e9105706-e04a-451a-8866-ebcc1051dab8
 
-You can also open or download it from GitHub:
 
-[View the NexusDrive demo video](https://github.com/RiyanshOverlord/NexusDrive/blob/main/NexusDrive.mp4)
+
+
+
 
 ## Implemented functionality
 
@@ -81,8 +82,6 @@ AWS_SECRET_ACCESS_KEY=server-side-secret-key
 AWS_S3_BUCKET_NAME=your-private-bucket
 ```
 
-Only the Supabase `NEXT_PUBLIC_*` values are browser-accessible. AWS
-credentials must remain server-side and must never be committed.
 
 ### 3. Configure Supabase
 
@@ -168,8 +167,7 @@ file upload, file download, deletion, and theme switching.
   [`lib/storage.ts`](./lib/storage.ts).
 - Pending uploads remain visible until they are finalized or cleaned up.
 
-Never commit `.env.local`, AWS access keys, Supabase tokens, or other
-credentials. Keep the S3 bucket private.
+
 
 ## Project structure
 
