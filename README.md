@@ -16,9 +16,6 @@ You can also open or download it from GitHub:
 
 [View the NexusDrive demo video](https://github.com/RiyanshOverlord/NexusDrive/blob/main/NexusDrive.mp4)
 
-To show the video as GitHub's small inline player, follow
-[Adding the video player to GitHub](#adding-the-video-player-to-github).
-
 ## Implemented functionality
 
 ### Private drive workflow
@@ -173,45 +170,6 @@ file upload, file download, deletion, and theme switching.
 
 Never commit `.env.local`, AWS access keys, Supabase tokens, or other
 credentials. Keep the S3 bucket private.
-
-## Adding the video player to GitHub
-
-The committed file link you provided:
-
-```text
-https://github.com/RiyanshOverlord/NexusDrive/blob/main/NexusDrive.mp4
-```
-
-opens the MP4 as a repository file. GitHub does not normally turn that
-`blob` URL into the small inline video box inside a README. Use a GitHub user
-attachment instead:
-
-1. Open a new issue, discussion, or pull request in the repository.
-2. Start writing a comment.
-3. Drag `NexusDrive.mp4` from the repository into the comment box, or use the
-   attachment control.
-4. Wait for GitHub to finish uploading the video.
-5. Copy the generated URL. It normally looks like:
-
-   ```text
-   https://github.com/user-attachments/assets/<video-id>
-   ```
-
-6. Edit this README and replace
-   `PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE` with that full URL on its own
-   line.
-7. Commit and push the README.
-8. Open the README on GitHub. GitHub should render the attachment URL as a
-   compact playable video box.
-
-Add the attachment URL here after uploading it:
-
-```text
-PASTE_GITHUB_VIDEO_ATTACHMENT_URL_HERE
-```
-
-Keep [`NexusDrive.mp4`](./NexusDrive.mp4) in the repository as a downloadable
-copy.
 
 ## Project structure
 
